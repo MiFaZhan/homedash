@@ -26,7 +26,7 @@ homedash 做三件事：
 - **运行形态徽标**：🐳 Docker / ⚙️ systemd / 🖥️ 宿主机进程 / 🔗 Tailscale，一眼分清"容器跑的"还是"装在本机的"
 - **多页而非分组**：像 WeTab 一样一页一场景（首页 / 开发 / 运维 / 外部 / 自动发现），左右翻页，页面可自建
 - **健康状态**：定时 HTTP 探测，卡片上直接显示 online/offline 与延迟
-- **零构建前端**：原生 JS + CSS，单二进制内嵌静态资源，`go install` 即用
+- **现代前端**：React 19 + TypeScript + Vite + Tailwind CSS v4 + Radix UI 组件 + TanStack Query，构建产物用 `go:embed` 打进单二进制
 - **配置即真相**：`config.yaml` 是唯一数据源，界面上的每一次编辑都原子写盘并保留备份
 - **可选认证**：默认关闭；开启后为 HTTP Basic Auth（bcrypt），公网暴露时建议必开
 - **主题切换**：深色 / 浅色 / 跟随系统，顶栏一键切换，选择记在浏览器本地
@@ -187,16 +187,28 @@ cloudflared tunnel run --url http://127.0.0.1:3010
 
 细节见 [docs/SCANNING.md](docs/SCANNING.md)。
 
+## 技术栈
+
+| 层 | 选型 |
+|---|---|
+| 后端 | Go 1.26（标准库 HTTP + `yaml.v3` + `x/crypto/bcrypt`），单二进制 |
+| 前端 | React 19 · TypeScript · Vite 7 · Tailwind CSS v4 |
+| UI 组件 | Radix UI primitives（Dialog / Select / Switch / Slider / Tooltip）· lucide-react |
+| 数据 | TanStack Query · 拖拽排序 @dnd-kit |
+| 打包 | Vite 产物 → `go:embed` → 一个可执行文件 |
+
 ## 开发
 
 ```bash
 git clone https://github.com/mifazhan/homedash && cd homedash
-make test      # go test ./...
-make build     # 生成 ./homedash
-make run       # 本地跑起来
+make all        # 构建前端 + 编译后端
+make run        # 运行 ./homedash（前端已内嵌）
+make dev        # 后端 :3010 + Vite :5173（热更新，/api 自动代理）
+make test       # go test ./...  + 前端 tsc 类型检查
 ```
 
-前端是原生 JS，**没有构建步骤**：改 `internal/web/assets/*` 重新 `make build` 即可。
+改前端只需在 `web/` 下开发，`make dev` 有热更新；发布前 `make all` 会把新产物写进
+`internal/web/dist` 并被 Go 打包。
 
 ## License
 

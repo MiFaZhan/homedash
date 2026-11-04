@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+
+  --color-bg: #0b0d12;
+  --color-bg-soft: #12151d;
+  --color-surface: #151922;
+  --color-surface-2: #1b2029;
+  --color-border: #262c38;
+  --color-fg: #e8edf5;
+  --color-fg-muted: #8b95a7;
+  --color-brand: #6ea8ff;
+  --color-brand-fg: #06121f;
+  --color-danger: #ff6b6b;
+  --color-ok: #35d07f;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d12;
+    --bg-soft: #101319;
+    --surface: #151922;
+    --surface-2: #1b2029;
+    --border: #262c38;
+    --border-strong: #333b4b;
+    --fg: #e8edf5;
+    --fg-muted: #8b95a7;
+    --brand: #6ea8ff;
+    --brand-fg: #06121f;
+    --danger: #ff6b6b;
+    --ok: #35d07f;
+    --tile: 88px;
+    --shadow-tile: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  }
+
+  .light {
+    color-scheme: light;
+    --bg: #f5f6f8;
+    --bg-soft: #eceef2;
+    --surface: #ffffff;
+    --surface-2: #f4f6f9;
+    --border: #e2e6ec;
+    --border-strong: #cfd6e0;
+    --fg: #111827;
+    --fg-muted: #5c6675;
+    --brand: #3358d4;
+    --brand-fg: #ffffff;
+    --danger: #d33a3a;
+    --ok: #1f9d5a;
+    --shadow-tile: 0 1px 2px rgb(15 23 42 / 0.06), 0 6px 16px -10px rgb(15 23 42 / 0.25);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 35%, transparent);
+  }
+}
+
+/* thin, unobtrusive scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+@utility surface-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+@utility focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 70%, transparent);
+  outline-offset: 2px;
+}

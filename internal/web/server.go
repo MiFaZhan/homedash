@@ -24,8 +24,8 @@ import (
 	"homedash/internal/store"
 )
 
-//go:embed assets
-var assets embed.FS
+//go:embed all:dist
+var dist embed.FS
 
 // Server owns the configuration, the scanner and the HTTP routes.
 type Server struct {
@@ -75,10 +75,9 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	mux.HandleFunc("GET /assets/", s.handleAssets)
 	mux.HandleFunc("GET /icons/{name}", s.handleIcons)
 	mux.HandleFunc("GET /wallpapers/{name}", s.handleWallpaper)
-	mux.HandleFunc("GET /", s.handleIndex)
+	mux.HandleFunc("GET /", s.serveSPA)
 
 	handler := s.withAuth(mux)
 	srv := &http.Server{
@@ -553,36 +552,58 @@ func (s *Server) handleIcons(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, name, time.Time{}, strings.NewReader(string(data)))
 }
 
-func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
-	name := strings.TrimPrefix(r.URL.Path, "/assets/")
+// serveSPA serves the built frontend, falling back to index.html so that
+// client side routes keep working on a hard refresh.
+func (s *Server) serveSPA(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/")
 	if name == "" {
-		http.NotFound(w, r)
-		return
+		name = "index.html"
 	}
-	data, err := fs.ReadFile(assets, "assets/"+name)
+	if !strings.Contains(name, "..") {
+		if data, err := fs.ReadFile(dist, "dist/"+name); err == nil {
+			w.Header().Set("Content-Type", contentTypeFor(name))
+			cacheControl(w, name)
+			_, _ = w.Write(data)
+			return
+		}
+	}
+	index, err := fs.ReadFile(dist, "dist/index.html")
 	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	switch {
-	case strings.HasSuffix(name, ".html"):
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	case strings.HasSuffix(name, ".css"):
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	case strings.HasSuffix(name, ".js"):
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-	}
-	w.Write(data)
-}
-
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	data, err := fs.ReadFile(assets, "assets/index.html")
-	if err != nil {
-		http.Error(w, "assets missing", http.StatusInternalServerError)
+		http.Error(w, "frontend assets missing; run `cd web && npm run build`", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(data)
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write(index)
+}
+
+func contentTypeFor(name string) string {
+	switch {
+	case strings.HasSuffix(name, ".html"):
+		return "text/html; charset=utf-8"
+	case strings.HasSuffix(name, ".css"):
+		return "text/css; charset=utf-8"
+	case strings.HasSuffix(name, ".js"):
+		return "application/javascript; charset=utf-8"
+	case strings.HasSuffix(name, ".svg"):
+		return "image/svg+xml"
+	case strings.HasSuffix(name, ".json"):
+		return "application/json"
+	case strings.HasSuffix(name, ".woff2"):
+		return "font/woff2"
+	case strings.HasSuffix(name, ".png"):
+		return "image/png"
+	}
+	return "application/octet-stream"
+}
+
+// cacheControl keeps hashed build assets cacheable and the shell fresh.
+func cacheControl(w http.ResponseWriter, name string) {
+	if strings.HasPrefix(name, "assets/") {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
 }
 
 func decodeService(r *http.Request) (model.Service, error) {
