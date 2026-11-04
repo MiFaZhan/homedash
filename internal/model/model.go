@@ -1,7 +1,64 @@
 // Package model holds the configuration structures of homedash.
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
+
+// FlexTime accepts the timestamp formats humans and tools actually write,
+// including "2006-01-02 15:04:05" with a space separator.
+type FlexTime struct {
+	time.Time
+}
+
+// UnmarshalYAML parses RFC3339 as well as the space separated variant.
+func (t *FlexTime) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var s string
+	if err := unmarshal(&s); err == nil {
+		if s == "" {
+			t.Time = time.Time{}
+			return nil
+		}
+		layouts := []string{
+			time.RFC3339Nano,
+			time.RFC3339,
+			"2006-01-02 15:04:05.999999999Z07:00",
+			"2006-01-02 15:04:05",
+			"2006-01-02",
+		}
+		for _, layout := range layouts {
+			if v, err := time.Parse(layout, s); err == nil {
+				t.Time = v
+				return nil
+			}
+		}
+		return fmt.Errorf("cannot parse timestamp %q", s)
+	}
+	var tv time.Time
+	if err := unmarshal(&tv); err == nil {
+		t.Time = tv
+		return nil
+	}
+	return fmt.Errorf("cannot parse timestamp")
+}
+
+// MarshalYAML writes RFC3339.
+func (t FlexTime) MarshalYAML() (interface{}, error) {
+	if t.IsZero() {
+		return "", nil
+	}
+	return t.Time.Format(time.RFC3339Nano), nil
+}
+
+// MarshalJSON writes RFC3339.
+func (t FlexTime) MarshalJSON() ([]byte, error) {
+	if t.IsZero() {
+		return []byte(`""`), nil
+	}
+	return json.Marshal(t.Time.Format(time.RFC3339))
+}
 
 // Runtime classifies how a service is executed on the machine.
 const (
@@ -68,7 +125,7 @@ type Service struct {
 	Status      string            `yaml:"status" json:"status"`
 	LatencyMS   int64             `yaml:"latency_ms,omitempty" json:"latency_ms,omitempty"`
 	HTTPStatus  int               `yaml:"http_status,omitempty" json:"http_status,omitempty"`
-	LastSeen    time.Time         `yaml:"last_seen" json:"last_seen"`
+	LastSeen    FlexTime          `yaml:"last_seen" json:"last_seen"`
 }
 
 // Page is a tab of the dashboard. The dashboard shows one page at a time and

@@ -63,7 +63,7 @@ function renderTabs() {
     tab.appendChild(document.createTextNode(p.name));
     const count = state.services.filter((s) => s.page === p.id).length;
     tab.appendChild(el("span", "count", count));
-    tab.onclick = () => { state.page = i; render(); };
+    tab.onclick = () => { state.page = i; location.hash = p.id; render(); };
     if (state.edit) {
       tab.ondblclick = () => openPageDrawer(p);
     }
@@ -106,6 +106,22 @@ function renderGrid() {
   if (state.edit) enableDragAndDrop(grid);
 }
 
+const ICON_GLYPHS = {
+  "database": "\u{1F5C4}", "monitor": "\u{1F5A5}", "network": "\u{1F310}",
+  "shield": "\u{1F6E1}", "terminal": "\u{1F4BB}", "nginx": "\u{1F9F1}",
+  "printer": "\u{1F5A8}", "box": "\u{1F4E6}", "bot": "\u{1F916}",
+  "activity": "\u{1F4C8}", "chart": "\u{1F4CA}", "globe": "\u{1F310}",
+  "mail": "\u{2709}", "layout-dashboard": "\u{1F5C2}", "help-circle": "❓",
+  "image": "\u{1F5BC}", "docker": "\u{1F433}", "server": "\u{1F5A5}",
+};
+
+function iconGlyph(icon) {
+  if (!icon) return "🔹";
+  if (icon.startsWith("/")) return null; // rendered as an image
+  if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(icon)) return icon;
+  return ICON_GLYPHS[icon] || "🔹";
+}
+
 function card(svc) {
   const node = el("div", "card" + (svc.hidden ? " hidden-service" : ""));
   node.draggable = state.edit;
@@ -113,13 +129,15 @@ function card(svc) {
 
   const head = el("div", "card-head");
   const icon = el("div", "icon");
-  if (svc.icon && svc.icon.startsWith("/")) {
+  const glyph = iconGlyph(svc.icon);
+  if (glyph === null) {
     const img = document.createElement("img");
     img.src = svc.icon;
     img.alt = svc.name;
+    img.onerror = () => { icon.textContent = "🔹"; };
     icon.appendChild(img);
   } else {
-    icon.textContent = svc.icon || "•";
+    icon.textContent = glyph;
   }
   head.appendChild(icon);
   head.appendChild(el("div", "card-name", svc.name));
@@ -318,6 +336,11 @@ function bind() {
 }
 
 function render() {
+  const hash = (location.hash || "").replace("#", "");
+  if (hash) {
+    const idx = state.pages.findIndex((p) => p.id === hash);
+    if (idx >= 0) state.page = idx;
+  }
   renderTabs();
   renderFilters();
   renderGrid();

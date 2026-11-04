@@ -120,7 +120,7 @@ func Scan(opts Options) (Result, error) {
 			Detail:   cls.Detail,
 			Managed:  model.ManagedDiscovered,
 			Status:   model.StatusUnknown,
-			LastSeen: time.Now(),
+			LastSeen: model.FlexTime{Time: time.Now()},
 		}
 		svc.Name = nameFor(svcName(s, hint, proc))
 		svc.Description = hint.Description
