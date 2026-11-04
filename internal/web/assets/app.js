@@ -1,4 +1,9 @@
 /* homedash dashboard - vanilla JS, no build step */
+const THEMES = ["auto", "light", "dark"];
+const THEME_LABELS = { auto: "跟随系统", light: "浅色", dark: "深色" };
+const THEME_ICONS = { auto: "🌗", light: "☀️", dark: "🌙" };
+const THEME_KEY = "homedash.theme";
+
 const state = {
   pages: [],
   services: [],
@@ -294,13 +299,39 @@ function flip(dir) {
   render();
 }
 
+function currentTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  return THEMES.includes(saved) ? saved : "auto";
+}
+
+function applyTheme(theme) {
+  if (theme === "auto") {
+    document.documentElement.removeAttribute("data-theme");
+  } else {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+  const btn = document.getElementById("themeBtn");
+  if (btn) {
+    btn.textContent = THEME_ICONS[theme];
+    btn.title = `主题：${THEME_LABELS[theme]}（点击切换）`;
+  }
+}
+
+function cycleTheme() {
+  const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+}
+
 function bind() {
+  applyTheme(currentTheme());
   $("#scanBtn").onclick = async () => {
     $("#scanBtn").textContent = "扫描中…";
     try { await api("/api/scan", "POST"); } catch (e) { alert("扫描失败: " + e.message); }
     $("#scanBtn").textContent = "扫描";
     await load();
   };
+  $("#themeBtn").onclick = cycleTheme;
   $("#editBtn").onclick = () => {
     state.edit = !state.edit;
     $("#editBtn").classList.toggle("on", state.edit);
