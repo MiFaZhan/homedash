@@ -46,6 +46,15 @@ func DefaultConfig() *model.Config {
 			PortsTable:   "",
 		},
 		Auth: model.Auth{Enabled: false, User: "admin"},
+		Appearance: model.Appearance{
+			Wallpaper:     "",
+			WallpaperBlur: 0,
+			WallpaperDim:  0.35,
+			ShowLabels:    true,
+			TileSize:      "md",
+			DesktopMode:   false,
+			FreeLayout:    true,
+		},
 		Pages: []model.Page{
 			{ID: "home", Name: "Home", Order: 10},
 			{ID: "dev", Name: "Development", Order: 20},

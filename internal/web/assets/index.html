@@ -7,48 +7,89 @@
 <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
+<div id="wallpaper" class="wallpaper"></div>
+<div class="bg">
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+  <div class="blob blob-c"></div>
+  <svg class="arcs" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <path d="M-100,700 C300,380 700,340 1540,240" />
+    <path d="M-80,180 C420,520 900,620 1520,700" />
+  </svg>
+</div>
+
 <header class="topbar">
-  <div class="brand">
-    <span class="logo">◆</span>
-    <span class="title">homedash</span>
+  <div class="brand"><span class="logo"></span><span class="title">homedash</span></div>
+  <div class="search-wrap">
+    <input id="search" class="search" type="search" placeholder="搜索服务…  按 / 聚焦" autocomplete="off">
   </div>
-  <input id="search" class="search" type="search" placeholder="搜索服务 / 过滤（/ 聚焦）" autocomplete="off">
   <div class="actions">
     <span id="runtimeFilters" class="chips"></span>
-    <button id="themeBtn" class="btn" title="切换主题：深色 / 浅色 / 跟随系统">🌙</button>
-    <button id="scanBtn" class="btn" title="立即扫描">扫描</button>
-    <button id="editBtn" class="btn" title="编辑模式">编辑</button>
+    <button id="themeBtn" class="icon-btn" title="主题">🌗</button>
+    <button id="settingsBtn" class="icon-btn" title="设置：壁纸 / 图标文字 / 桌面模式">⚙</button>
+    <button id="scanBtn" class="icon-btn" title="立即扫描">⟳</button>
+    <button id="editBtn" class="icon-btn" title="编辑模式">✎</button>
   </div>
 </header>
 
-<nav class="pager">
-  <button id="prevPage" class="pager-btn" aria-label="上一页">‹</button>
-  <div id="tabs" class="tabs"></div>
-  <button id="nextPage" class="pager-btn" aria-label="下一页">›</button>
-</nav>
+<nav class="rail" id="rail"></nav>
 
-<main id="grid" class="grid"></main>
+<main id="canvas" class="canvas"></main>
 
 <div id="empty" class="empty hidden">
-  <p>这一页还没有服务。</p>
+  <p>这一页还没有服务</p>
   <button id="addBtn" class="btn primary">添加服务</button>
 </div>
+
+<aside id="settingsDrawer" class="drawer hidden">
+  <div class="drawer-head">
+    <h2>设置</h2>
+    <button id="closeSettings" class="icon-btn ghost">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="field">
+      <span class="field-label">壁纸</span>
+      <div class="wallpaper-row">
+        <input id="wUpload" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,.svg" hidden>
+        <button id="wUploadBtn" class="btn ghost">上传图片</button>
+        <button id="wClearBtn" class="btn ghost">恢复默认</button>
+      </div>
+      <div id="wCurrent" class="detail">当前：默认渐变</div>
+    </div>
+    <label>背景模糊<input id="wBlur" type="range" min="0" max="40" step="1"></label>
+    <label>背景压暗<input id="wDim" type="range" min="0" max="80" step="5"></label>
+    <label class="check"><input id="optLabels" type="checkbox">显示图标文字</label>
+    <label class="check"><input id="optFree" type="checkbox">自由摆放图标（可拖动）</label>
+    <label class="check"><input id="optDesktop" type="checkbox">桌面模式（隐藏顶栏与侧栏）</label>
+    <label>图标大小
+      <select id="optSize">
+        <option value="sm">小</option>
+        <option value="md">中</option>
+        <option value="lg">大</option>
+      </select>
+    </label>
+  </div>
+  <div class="drawer-foot">
+    <button id="saveSettings" class="btn primary">保存</button>
+  </div>
+</aside>
 
 <aside id="drawer" class="drawer hidden">
   <div class="drawer-head">
     <h2 id="drawerTitle">编辑服务</h2>
-    <button id="closeDrawer" class="btn ghost">✕</button>
+    <button id="closeDrawer" class="icon-btn ghost">✕</button>
   </div>
   <div class="drawer-body">
     <label>名称<input id="fName" type="text"></label>
     <label>地址<input id="fUrl" type="text" placeholder="http://host:port"></label>
     <label>描述<input id="fDesc" type="text"></label>
-    <label>图标<input id="fIcon" type="text" placeholder="图标名或 emoji"></label>
+    <label>图标<input id="fIcon" type="text" placeholder="图标名、emoji 或 /icons/xxx.png"></label>
     <label>所属页面<select id="fPage"></select></label>
     <label>排序<input id="fOrder" type="number" step="10"></label>
     <div class="row">
       <label class="check"><input id="fHidden" type="checkbox">隐藏</label>
       <label class="check"><input id="fPin" type="checkbox">置顶</label>
+      <label class="check"><input id="fLabel" type="checkbox">显示名称</label>
     </div>
     <div id="detailBox" class="detail"></div>
     <div class="row">
@@ -65,7 +106,7 @@
 <aside id="pageDrawer" class="drawer hidden">
   <div class="drawer-head">
     <h2>页面</h2>
-    <button id="closePageDrawer" class="btn ghost">✕</button>
+    <button id="closePageDrawer" class="icon-btn ghost">✕</button>
   </div>
   <div class="drawer-body">
     <label>页面名称<input id="pName" type="text"></label>

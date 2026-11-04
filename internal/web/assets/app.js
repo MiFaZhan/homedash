@@ -4,7 +4,19 @@ const THEME_LABELS = { auto: "跟随系统", light: "浅色", dark: "深色" };
 const THEME_ICONS = { auto: "🌗", light: "☀️", dark: "🌙" };
 const THEME_KEY = "homedash.theme";
 
+const ICON_GLYPHS = {
+  database: "🗄️", monitor: "🖥️", network: "🌐", shield: "🛡️", terminal: "💻",
+  nginx: "🧱", printer: "🖨️", box: "📦", bot: "🤖", activity: "📈", chart: "📊",
+  globe: "🌍", mail: "✉️", "layout-dashboard": "🗂️", "help-circle": "❓",
+  image: "🖼️", docker: "🐳", server: "🗄️", cloud: "☁️", code: "🧑‍💻",
+};
+const PAGE_GLYPHS = ["🏠", "🧑‍💻", "🛠️", "🌍", "🔎", "📦", "🧪", "⭐"];
+
 const state = {
+  appearance: {
+    wallpaper: "", wallpaper_blur: 0, wallpaper_dim: 0.35,
+    show_labels: true, tile_size: "md", desktop_mode: false, free_layout: true,
+  },
   pages: [],
   services: [],
   page: 0,
@@ -26,10 +38,7 @@ async function api(path, method = "GET", body) {
   const opts = { method, headers: { "Content-Type": "application/json" } };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status} ${text}`);
-  }
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   return res.status === 204 ? null : res.json();
 }
 
@@ -37,13 +46,13 @@ async function load() {
   const cfg = await api("/api/config");
   state.pages = cfg.pages || [];
   state.services = cfg.services || [];
+  state.appearance = Object.assign(state.appearance, cfg.appearance || {});
+  applyAppearance();
   if (state.page >= state.pages.length) state.page = 0;
   render();
 }
 
-function currentPage() {
-  return state.pages[state.page];
-}
+const currentPage = () => state.pages[state.page];
 
 function visibleServices() {
   const page = currentPage();
@@ -51,125 +60,241 @@ function visibleServices() {
   return state.services
     .filter((s) => !page || s.page === page.id)
     .filter((s) => !state.runtimeFilter || s.runtime === state.runtimeFilter)
-    .filter((s) => {
-      if (!q) return true;
-      return (s.name || "").toLowerCase().includes(q) ||
-        (s.description || "").toLowerCase().includes(q) ||
-        (s.url || "").toLowerCase().includes(q);
-    })
+    .filter((s) => !q || (s.name || "").toLowerCase().includes(q) ||
+      (s.description || "").toLowerCase().includes(q) ||
+      (s.url || "").toLowerCase().includes(q))
     .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
 }
 
-function renderTabs() {
-  const tabs = $("#tabs");
-  tabs.innerHTML = "";
+/* ---------------- 背景与配色 ---------------- */
+
+function hashHue(text) {
+  let h = 0;
+  for (let i = 0; i < (text || "").length; i++) h = (h * 31 + text.charCodeAt(i)) % 360;
+  return h;
+}
+
+function tileGradient(name) {
+  const h = hashHue(name || "svc");
+  return [`hsl(${h} 68% 56%)`, `hsl(${(h + 42) % 360} 62% 40%)`];
+}
+
+function iconGlyph(icon) {
+  if (!icon) return "🔹";
+  if (icon.startsWith("/")) return null;
+  if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(icon)) return icon;
+  return ICON_GLYPHS[icon] || "🔹";
+}
+
+const runtimeGlyph = {
+  docker: "🐳", systemd: "⚙", process: "🖥", tailscale: "🔗", unknown: "❓",
+};
+
+/* ---------------- 外观 ---------------- */
+
+const TILE_SIZES = { sm: 56, md: 72, lg: 92 };
+
+function applyAppearance() {
+  const ap = state.appearance;
+  const wall = document.getElementById("wallpaper");
+  if (ap.wallpaper) {
+    wall.style.backgroundImage = `url("${ap.wallpaper}")`;
+    wall.classList.add("dim");
+    wall.style.setProperty("--dim", String(ap.wallpaper_dim ?? 0.35));
+    wall.style.filter = ap.wallpaper_blur ? `blur(${ap.wallpaper_blur}px)` : "";
+  } else {
+    wall.style.backgroundImage = "";
+    wall.classList.remove("dim");
+    wall.style.filter = "";
+  }
+  document.body.classList.toggle("desktop-mode", !!ap.desktop_mode);
+  document.documentElement.style.setProperty("--tile", (TILE_SIZES[ap.tile_size] || 72) + "px");
+}
+
+/* ---------------- 渲染 ---------------- */
+
+function renderRail() {
+  const rail = $("#rail");
+  rail.innerHTML = "";
   state.pages.forEach((p, i) => {
-    const tab = el("div", "tab" + (i === state.page ? " active" : ""));
-    tab.appendChild(document.createTextNode(p.name));
-    const count = state.services.filter((s) => s.page === p.id).length;
-    tab.appendChild(el("span", "count", count));
-    tab.onclick = () => { state.page = i; location.hash = p.id; render(); };
-    if (state.edit) {
-      tab.ondblclick = () => openPageDrawer(p);
-    }
-    tabs.appendChild(tab);
+    const btn = el("button", "rail-btn" + (i === state.page ? " active" : ""));
+    btn.innerHTML = PAGE_GLYPHS[i % PAGE_GLYPHS.length];
+    btn.appendChild(el("span", "rail-label", p.name));
+    btn.onclick = () => { state.page = i; location.hash = p.id; render(); };
+    if (state.edit) btn.ondblclick = () => openPageDrawer(p);
+    rail.appendChild(btn);
   });
   if (state.edit) {
-    const add = el("div", "tab", "＋ 页面");
+    rail.appendChild(el("div", "rail-sep"));
+    const add = el("button", "rail-btn", "＋");
+    add.appendChild(el("span", "rail-label", "新建页面"));
     add.onclick = () => openPageDrawer(null);
-    tabs.appendChild(add);
+    rail.appendChild(add);
   }
 }
 
 function renderFilters() {
   const box = $("#runtimeFilters");
   box.innerHTML = "";
-  const kinds = ["docker", "systemd", "process", "tailscale"];
-  kinds.forEach((k) => {
-    const chip = el("div", "chip" + (state.runtimeFilter === k ? " active" : ""), runtimeLabel(k));
+  ["docker", "systemd", "process", "tailscale"].forEach((k) => {
+    const chip = el("div", "chip" + (state.runtimeFilter === k ? " active" : ""),
+      `${runtimeGlyph[k]} ${k}`);
     chip.onclick = () => { state.runtimeFilter = state.runtimeFilter === k ? "" : k; render(); };
     box.appendChild(chip);
   });
 }
 
-function runtimeLabel(rt) {
-  switch (rt) {
-    case "docker": return "🐳 Docker";
-    case "systemd": return "⚙ systemd";
-    case "process": return "🖥 宿主机";
-    case "tailscale": return "🔗 Tailscale";
-    default: return "❓ 未知";
-  }
-}
-
-function renderGrid() {
-  const grid = $("#grid");
-  grid.innerHTML = "";
+function renderCanvas() {
+  const canvas = $("#canvas");
+  canvas.innerHTML = "";
   const list = visibleServices();
   $("#empty").classList.toggle("hidden", list.length > 0);
-  list.forEach((svc) => grid.appendChild(card(svc)));
-  if (state.edit) enableDragAndDrop(grid);
+  if (!list.length) return;
+
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  const tile = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--tile"), 10) || 72;
+  const railSpace = state.appearance.desktop_mode ? 40 : 110;
+  const usable = Math.max(200, w - railSpace - 40);
+  const gap = Math.round(tile * (usable < 520 ? 0.28 : 0.47));
+  const maxSpread = Math.max(tile, usable - tile - 40);
+  const perCluster = Math.max(2, Math.min(7, Math.floor(maxSpread / (tile + gap)) + 1));
+  const free = state.appearance.free_layout !== false;
+
+  const placed = list.filter((s) => free && s.x !== null && s.x !== undefined && s.y !== null && s.y !== undefined);
+  const auto = list.filter((s) => !placed.includes(s));
+
+  // 已固定位置的图标
+  placed.forEach((svc) => {
+    const node = tileNode(svc, svc.x, svc.y);
+    node.classList.add("pinned");
+    canvas.appendChild(node);
+  });
+
+  // 自动排布的图标（沿弧线成组）
+  const clusters = [];
+  for (let i = 0; i < auto.length; i += perCluster) clusters.push(auto.slice(i, i + perCluster));
+  const bandH = tile + 190;
+  const cols = w < 1180 ? 1 : 2;
+
+  clusters.forEach((group, ci) => {
+    const col = cols === 1 ? 0 : ci % cols;
+    const row = cols === 1 ? ci : Math.floor(ci / cols);
+    const spread = Math.min((group.length - 1) * (tile + gap), maxSpread);
+    const clusterW = spread + tile + 110;
+    const usable = w - railSpace;
+    const cx = clusters.length === 1
+      ? railSpace + (w - railSpace) / 2
+      : railSpace + (w - railSpace) * (cols === 1 ? 0.5 : 0.26 + col * 0.48);
+    const cy = Math.max(150, h * 0.42) + row * bandH;
+
+    const blob = el("div", "cluster");
+    blob.style.width = `${clusterW}px`;
+    blob.style.height = `${tile + 140}px`;
+    blob.style.left = `${cx - clusterW / 2}px`;
+    blob.style.top = `${cy - tile / 2 - 66}px`;
+    blob.style.transform = `rotate(${(ci % 2 ? 1.3 : -1.1)}deg)`;
+    canvas.appendChild(blob);
+
+    group.forEach((svc, i) => {
+      const t = group.length === 1 ? 0 : (i / (group.length - 1)) - 0.5;
+      const x = cx + t * spread;
+      const y = cy + Math.pow(Math.abs(t), 1.7) * 140 + Math.sin(i * 1.6) * 5;
+      canvas.appendChild(tileNode(svc, x - tile / 2, y - tile / 2));
+    });
+  });
+
+  if (state.edit) enableDragAndDrop(canvas);
+  if (state.appearance.free_layout !== false) enableFreeDrag(canvas);
 }
 
-const ICON_GLYPHS = {
-  "database": "\u{1F5C4}", "monitor": "\u{1F5A5}", "network": "\u{1F310}",
-  "shield": "\u{1F6E1}", "terminal": "\u{1F4BB}", "nginx": "\u{1F9F1}",
-  "printer": "\u{1F5A8}", "box": "\u{1F4E6}", "bot": "\u{1F916}",
-  "activity": "\u{1F4C8}", "chart": "\u{1F4CA}", "globe": "\u{1F310}",
-  "mail": "\u{2709}", "layout-dashboard": "\u{1F5C2}", "help-circle": "❓",
-  "image": "\u{1F5BC}", "docker": "\u{1F433}", "server": "\u{1F5A5}",
-};
-
-function iconGlyph(icon) {
-  if (!icon) return "🔹";
-  if (icon.startsWith("/")) return null; // rendered as an image
-  if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(icon)) return icon;
-  return ICON_GLYPHS[icon] || "🔹";
-}
-
-function card(svc) {
-  const node = el("div", "card" + (svc.hidden ? " hidden-service" : ""));
+function tileNode(svc, left, top) {
+  const node = el("div", "tile");
+  node.style.left = `${left}px`;
+  node.style.top = `${top}px`;
   node.draggable = state.edit;
   node.dataset.id = svc.id;
 
-  const head = el("div", "card-head");
-  const icon = el("div", "icon");
+  const inner = el("div", "tile-inner");
+  const [c1, c2] = tileGradient(svc.name);
+  inner.style.setProperty("--c1", c1);
+  inner.style.setProperty("--c2", c2);
   const glyph = iconGlyph(svc.icon);
   if (glyph === null) {
     const img = document.createElement("img");
     img.src = svc.icon;
     img.alt = svc.name;
-    img.onerror = () => { icon.textContent = "🔹"; };
-    icon.appendChild(img);
+    img.onerror = () => { inner.textContent = "🔹"; };
+    inner.appendChild(img);
   } else {
-    icon.textContent = glyph;
+    inner.textContent = glyph;
   }
-  head.appendChild(icon);
-  head.appendChild(el("div", "card-name", svc.name));
-  node.appendChild(head);
+  node.appendChild(inner);
 
-  if (svc.description) node.appendChild(el("div", "card-desc", svc.description));
+  const dot = el("span", "badge-dot dot-" + (svc.status || "unknown"));
+  node.appendChild(dot);
 
-  const foot = el("div", "card-foot");
-  foot.appendChild(el("span", "dot " + (svc.status || "unknown")));
-  foot.appendChild(el("span", "", svc.status === "online" ? `${svc.latency_ms || 0}ms` : (svc.status || "unknown")));
-  foot.appendChild(el("span", "badge " + (svc.runtime || "unknown"), runtimeLabel(svc.runtime)));
-  if (svc.port) foot.appendChild(el("span", "", ":" + svc.port));
-  if (svc.pin) foot.appendChild(el("span", "", "📌"));
-  node.appendChild(foot);
+  if (state.edit) {
+    const rt = el("span", "rt rt-" + (svc.runtime || "unknown"), runtimeGlyph[svc.runtime || "unknown"]);
+    node.appendChild(rt);
+  }
+
+  const label = el("span", "tile-label", svc.name);
+  const showLabel = svc.show_label === true || (svc.show_label !== false && state.appearance.show_labels);
+  if (showLabel) node.classList.add("show-label");
+  node.appendChild(label);
 
   node.onclick = () => {
     if (state.edit) { openDrawer(svc); return; }
     window.open(svc.url, "_blank", "noopener");
   };
+  node.title = `${svc.name}${svc.description ? " — " + svc.description : ""}`;
   return node;
 }
 
-function enableDragAndDrop(grid) {
+function enableFreeDrag(canvas) {
+  canvas.querySelectorAll(".tile").forEach((node) => {
+    node.onmousedown = (e) => {
+      if (state.edit) return;           // 编辑模式用排序拖拽
+      const svc = state.services.find((s) => s.id === node.dataset.id);
+      if (!svc) return;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const originLeft = node.offsetLeft;
+      const originTop = node.offsetTop;
+      let moved = false;
+
+      const move = (ev) => {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+        node.style.left = `${originLeft + dx}px`;
+        node.style.top = `${originTop + dy}px`;
+        node.style.zIndex = "5";
+      };
+      const up = async () => {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        node.style.zIndex = "";
+        if (!moved) return;
+        const x = Math.round(node.offsetLeft);
+        const y = Math.round(node.offsetTop);
+        node.classList.add("pinned");
+        await api(`/api/services/${encodeURIComponent(svc.id)}`, "PUT",
+          Object.assign({}, svc, { x, y }));
+        await load();
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
+    };
+  });
+}
+
+function enableDragAndDrop(canvas) {
   let dragged = null;
-  grid.querySelectorAll(".card").forEach((node) => {
+  canvas.querySelectorAll(".tile").forEach((node) => {
     node.ondragstart = () => { dragged = node; node.classList.add("dragging"); };
-    node.ondragend = () => { node.classList.remove("dragging"); };
+    node.ondragend = () => node.classList.remove("dragging");
     node.ondragover = (e) => e.preventDefault();
     node.ondrop = async (e) => {
       e.preventDefault();
@@ -185,8 +310,13 @@ function enableDragAndDrop(grid) {
   });
 }
 
+/* ---------------- 编辑抽屉 ---------------- */
+
 function openDrawer(svc) {
-  state.editing = svc || { name: "", url: "", description: "", icon: "", page: currentPage()?.id, order: 0, hidden: false, pin: false };
+  state.editing = svc || {
+    name: "", url: "", description: "", icon: "",
+    page: currentPage()?.id, order: 0, hidden: false, pin: false,
+  };
   $("#drawerTitle").textContent = svc ? "编辑服务" : "添加服务";
   $("#fName").value = state.editing.name || "";
   $("#fUrl").value = state.editing.url || "";
@@ -195,6 +325,7 @@ function openDrawer(svc) {
   $("#fOrder").value = state.editing.order || 0;
   $("#fHidden").checked = !!state.editing.hidden;
   $("#fPin").checked = !!state.editing.pin;
+  $("#fLabel").checked = state.editing.show_label !== false;
   const pageSel = $("#fPage");
   pageSel.innerHTML = "";
   state.pages.forEach((p) => {
@@ -204,7 +335,7 @@ function openDrawer(svc) {
     pageSel.appendChild(opt);
   });
   const detail = $("#detailBox");
-  detail.textContent = "";
+  detail.innerHTML = "";
   if (svc && svc.runtime_detail) {
     Object.entries(svc.runtime_detail).forEach(([k, v]) => {
       detail.appendChild(el("div", "", `${k}: ${v}`));
@@ -229,6 +360,7 @@ async function saveService() {
     order: parseInt($("#fOrder").value || "0", 10),
     hidden: $("#fHidden").checked,
     pin: $("#fPin").checked,
+    show_label: $("#fLabel").checked,
   });
   if (!svc.name || !svc.url) { alert("名称和地址必填"); return; }
   if (state.editing && state.editing.id) {
@@ -293,11 +425,35 @@ async function uploadIcon() {
   input.click();
 }
 
-function flip(dir) {
-  if (!state.pages.length) return;
-  state.page = (state.page + dir + state.pages.length) % state.pages.length;
-  render();
+function openSettings() {
+  const ap = state.appearance;
+  $("#optLabels").checked = !!ap.show_labels;
+  $("#optFree").checked = ap.free_layout !== false;
+  $("#optDesktop").checked = !!ap.desktop_mode;
+  $("#optSize").value = ap.tile_size || "md";
+  $("#wBlur").value = ap.wallpaper_blur || 0;
+  $("#wDim").value = Math.round((ap.wallpaper_dim ?? 0.35) * 100);
+  $("#wCurrent").textContent = ap.wallpaper ? "当前：" + ap.wallpaper.split("/").pop() : "当前：默认渐变";
+  $("#settingsDrawer").classList.remove("hidden");
 }
+
+async function saveSettings() {
+  const payload = {
+    wallpaper: state.appearance.wallpaper || "",
+    wallpaper_blur: parseInt($("#wBlur").value || "0", 10),
+    wallpaper_dim: parseInt($("#wDim").value || "35", 10) / 100,
+    show_labels: $("#optLabels").checked,
+    free_layout: $("#optFree").checked,
+    desktop_mode: $("#optDesktop").checked,
+    tile_size: $("#optSize").value,
+  };
+  state.appearance = Object.assign(state.appearance, payload);
+  applyAppearance();
+  await api("/api/settings", "POST", payload);
+  await load();
+}
+
+/* ---------------- 主题 ---------------- */
 
 function currentTheme() {
   const saved = localStorage.getItem(THEME_KEY);
@@ -305,11 +461,8 @@ function currentTheme() {
 }
 
 function applyTheme(theme) {
-  if (theme === "auto") {
-    document.documentElement.removeAttribute("data-theme");
-  } else {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
+  if (theme === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", theme);
   const btn = document.getElementById("themeBtn");
   if (btn) {
     btn.textContent = THEME_ICONS[theme];
@@ -323,47 +476,13 @@ function cycleTheme() {
   applyTheme(next);
 }
 
-function bind() {
-  applyTheme(currentTheme());
-  $("#scanBtn").onclick = async () => {
-    $("#scanBtn").textContent = "扫描中…";
-    try { await api("/api/scan", "POST"); } catch (e) { alert("扫描失败: " + e.message); }
-    $("#scanBtn").textContent = "扫描";
-    await load();
-  };
-  $("#themeBtn").onclick = cycleTheme;
-  $("#editBtn").onclick = () => {
-    state.edit = !state.edit;
-    $("#editBtn").classList.toggle("on", state.edit);
-    $("#editBtn").textContent = state.edit ? "完成" : "编辑";
-    render();
-  };
-  $("#search").oninput = (e) => { state.filter = e.target.value.trim(); renderGrid(); };
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); $("#search").focus(); }
-    if (e.key === "Escape") { closeDrawer(); $("#pageDrawer").classList.add("hidden"); }
-    if (e.key === "ArrowRight") flip(1);
-    if (e.key === "ArrowLeft") flip(-1);
-  });
-  $("#prevPage").onclick = () => flip(-1);
-  $("#nextPage").onclick = () => flip(1);
-  $("#closeDrawer").onclick = closeDrawer;
-  $("#saveBtn").onclick = saveService;
-  $("#deleteBtn").onclick = deleteService;
-  $("#addBtn").onclick = () => openDrawer(null);
-  $("#closePageDrawer").onclick = () => $("#pageDrawer").classList.add("hidden");
-  $("#addPageBtn").onclick = addPage;
-  $("#uploadBtn").onclick = uploadIcon;
+/* ---------------- 交互 ---------------- */
 
-  // swipe between pages
-  let startX = null;
-  document.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; }, { passive: true });
-  document.addEventListener("touchend", (e) => {
-    if (startX === null) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) > 70) flip(dx < 0 ? 1 : -1);
-    startX = null;
-  }, { passive: true });
+function flip(dir) {
+  if (!state.pages.length) return;
+  state.page = (state.page + dir + state.pages.length) % state.pages.length;
+  location.hash = state.pages[state.page].id;
+  render();
 }
 
 function render() {
@@ -372,9 +491,77 @@ function render() {
     const idx = state.pages.findIndex((p) => p.id === hash);
     if (idx >= 0) state.page = idx;
   }
-  renderTabs();
+  renderRail();
   renderFilters();
-  renderGrid();
+  renderCanvas();
+}
+
+function bind() {
+  applyTheme(currentTheme());
+  $("#scanBtn").onclick = async () => {
+    const btn = $("#scanBtn");
+    btn.textContent = "…";
+    try { await api("/api/scan", "POST"); } catch (e) { alert("扫描失败: " + e.message); }
+    btn.textContent = "⟳";
+    await load();
+  };
+  $("#editBtn").onclick = () => {
+    state.edit = !state.edit;
+    $("#editBtn").classList.toggle("on", state.edit);
+    render();
+  };
+  $("#themeBtn").onclick = cycleTheme;
+  $("#settingsBtn").onclick = openSettings;
+  $("#closeSettings").onclick = () => $("#settingsDrawer").classList.add("hidden");
+  $("#saveSettings").onclick = saveSettings;
+  $("#wUploadBtn").onclick = () => $("#wUpload").click();
+  $("#wUpload").onchange = async () => {
+    if (!$("#wUpload").files.length) return;
+    const fd = new FormData();
+    fd.append("file", $("#wUpload").files[0]);
+    const res = await fetch("/api/wallpapers", { method: "POST", body: fd });
+    if (!res.ok) { alert("壁纸上传失败"); return; }
+    const data = await res.json();
+    state.appearance.wallpaper = data.url;
+    applyAppearance();
+    $("#wCurrent").textContent = "当前：" + data.url.split("/").pop();
+  };
+  $("#wClearBtn").onclick = async () => {
+    state.appearance.wallpaper = "";
+    applyAppearance();
+    $("#wCurrent").textContent = "当前：默认渐变";
+  };
+  $("#search").oninput = (e) => { state.filter = e.target.value.trim(); renderCanvas(); };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "/" && document.activeElement.tagName !== "INPUT") {
+      e.preventDefault(); $("#search").focus();
+    }
+    if (e.key === "Escape") {
+      closeDrawer();
+      $("#pageDrawer").classList.add("hidden");
+      $("#settingsDrawer").classList.add("hidden");
+    }
+    if (e.key === "ArrowRight") flip(1);
+    if (e.key === "ArrowLeft") flip(-1);
+  });
+  $("#closeDrawer").onclick = closeDrawer;
+  $("#saveBtn").onclick = saveService;
+  $("#deleteBtn").onclick = deleteService;
+  $("#addBtn").onclick = () => openDrawer(null);
+  $("#closePageDrawer").onclick = () => $("#pageDrawer").classList.add("hidden");
+  $("#addPageBtn").onclick = addPage;
+  $("#uploadBtn").onclick = uploadIcon;
+
+  let startX = null;
+  document.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (startX === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 70) flip(dx < 0 ? 1 : -1);
+    startX = null;
+  }, { passive: true });
+
+  window.addEventListener("resize", () => renderCanvas());
 }
 
 bind();

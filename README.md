@@ -30,6 +30,9 @@ homedash 做三件事：
 - **配置即真相**：`config.yaml` 是唯一数据源，界面上的每一次编辑都原子写盘并保留备份
 - **可选认证**：默认关闭；开启后为 HTTP Basic Auth（bcrypt），公网暴露时建议必开
 - **主题切换**：深色 / 浅色 / 跟随系统，顶栏一键切换，选择记在浏览器本地
+- **自定义壁纸**：上传图片作为背景，可调模糊与压暗，支持"桌面模式"隐藏顶栏
+- **图标文字开关**：全局开关 + 每个图标单独覆盖
+- **自由摆放**：图标可直接拖到任意位置并持久化，也可退回自动弧线排布
 - **Docker 友好**：容器内扫描靠挂载 `/proc` 与 `/var/run/docker.sock`，compose 文件开箱即用
 
 ## 快速开始
@@ -75,6 +78,15 @@ WantedBy=default.target
 `~/.config/homedash/config.yaml`：
 
 ```yaml
+appearance:
+  wallpaper: ""            # /wallpapers/xxx.png，空则用默认渐变
+  wallpaper_blur: 0
+  wallpaper_dim: 0.35
+  show_labels: true        # 是否显示图标文字
+  tile_size: md            # sm / md / lg
+  desktop_mode: false      # 桌面模式：隐藏顶栏与侧栏
+  free_layout: true        # 自由摆放：图标可拖动并记住位置
+
 server:
   listen: 127.0.0.1:3010
   data_dir: ~/.local/share/homedash
@@ -126,10 +138,12 @@ ports:
 ### 方式 A：Tailscale（推荐）
 
 ```bash
-tailscale serve --bg --https=443 http://127.0.0.1:3010
+tailscale serve --bg --http=8091 http://127.0.0.1:3010
+# 其他设备访问 http://<host>.<tailnet>.ts.net:8091
 ```
 
-证书由 Tailscale 自动签发，访问控制交给 tailnet ACL，homedash 自身可以不开认证。
+tailnet 内部流量本身由 WireGuard 加密，HTTP 入口足够安全。若你的 tailnet 已能正常签发
+Let's Encrypt 证书，也可以用 `--https=443` 提供 HTTPS 入口。
 
 ### 方式 B：公网
 
@@ -157,6 +171,8 @@ cloudflared tunnel run --url http://127.0.0.1:3010
 | POST | `/api/pages` | 新增/更新页面 |
 | DELETE | `/api/pages/{id}` | 删除页面（服务移到自动发现页） |
 | POST | `/api/icons` | 上传图标（multipart，字段 `file`） |
+| POST | `/api/settings` | 保存外观设置（壁纸/文字/图标大小/桌面模式/自由摆放） |
+| POST | `/api/wallpapers` | 上传壁纸（multipart，字段 `file`） |
 
 ## 扫描原理
 

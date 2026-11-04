@@ -67,11 +67,14 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("POST /api/pages", s.handlePageUpsert)
 	mux.HandleFunc("DELETE /api/pages/{id}", s.handlePageDelete)
 	mux.HandleFunc("POST /api/icons", s.handleIconUpload)
+	mux.HandleFunc("POST /api/settings", s.handleSettings)
+	mux.HandleFunc("POST /api/wallpapers", s.handleWallpaperUpload)
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	mux.HandleFunc("GET /assets/", s.handleAssets)
 	mux.HandleFunc("GET /icons/{name}", s.handleIcons)
+	mux.HandleFunc("GET /wallpapers/{name}", s.handleWallpaper)
 	mux.HandleFunc("GET /", s.handleIndex)
 
 	handler := s.withAuth(mux)
@@ -192,10 +195,11 @@ func (s *Server) save() error {
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := s.Config()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pages":    cfg.Pages,
-		"services": cfg.Services,
-		"server":   cfg.Server,
-		"auth":     map[string]bool{"enabled": cfg.Auth.Enabled},
+		"pages":      cfg.Pages,
+		"services":   cfg.Services,
+		"server":     cfg.Server,
+		"appearance": cfg.Appearance,
+		"auth":       map[string]bool{"enabled": cfg.Auth.Enabled},
 	})
 }
 
@@ -380,6 +384,105 @@ func (s *Server) handleIconUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"url": "/icons/" + name})
+}
+
+type settingsRequest struct {
+	Wallpaper     *string  `json:"wallpaper"`
+	WallpaperBlur *int     `json:"wallpaper_blur"`
+	WallpaperDim  *float64 `json:"wallpaper_dim"`
+	ShowLabels    *bool    `json:"show_labels"`
+	TileSize      *string  `json:"tile_size"`
+	DesktopMode   *bool    `json:"desktop_mode"`
+	FreeLayout    *bool    `json:"free_layout"`
+}
+
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	var req settingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	s.mu.Lock()
+	ap := &s.cfg.Appearance
+	if req.Wallpaper != nil {
+		ap.Wallpaper = *req.Wallpaper
+	}
+	if req.WallpaperBlur != nil {
+		ap.WallpaperBlur = *req.WallpaperBlur
+	}
+	if req.WallpaperDim != nil {
+		ap.WallpaperDim = *req.WallpaperDim
+	}
+	if req.ShowLabels != nil {
+		ap.ShowLabels = *req.ShowLabels
+	}
+	if req.TileSize != nil {
+		ap.TileSize = *req.TileSize
+	}
+	if req.DesktopMode != nil {
+		ap.DesktopMode = *req.DesktopMode
+	}
+	if req.FreeLayout != nil {
+		ap.FreeLayout = *req.FreeLayout
+	}
+	result := *ap
+	s.mu.Unlock()
+	if err := s.save(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleWallpaperUpload(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	defer file.Close()
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg":
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported wallpaper type"})
+		return
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	dir := filepath.Join(store.Expand(s.Config().Server.DataDir), "wallpapers")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	name := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+	if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"url": "/wallpapers/" + name})
+}
+
+func (s *Server) handleWallpaper(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if name == "" || strings.Contains(name, "/") || strings.Contains(name, "..") {
+		http.NotFound(w, r)
+		return
+	}
+	dir := filepath.Join(store.Expand(s.Config().Server.DataDir), "wallpapers")
+	data, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeContent(w, r, name, time.Time{}, strings.NewReader(string(data)))
 }
 
 func (s *Server) handleIcons(w http.ResponseWriter, r *http.Request) {

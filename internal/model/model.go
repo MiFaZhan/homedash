@@ -106,6 +106,17 @@ type Auth struct {
 	PasswordHash string `yaml:"password_hash" json:"-"`
 }
 
+// Appearance holds the launcher look and feel settings.
+type Appearance struct {
+	Wallpaper     string  `yaml:"wallpaper" json:"wallpaper"`
+	WallpaperBlur int     `yaml:"wallpaper_blur" json:"wallpaper_blur"`
+	WallpaperDim  float64 `yaml:"wallpaper_dim" json:"wallpaper_dim"`
+	ShowLabels    bool    `yaml:"show_labels" json:"show_labels"`
+	TileSize      string  `yaml:"tile_size" json:"tile_size"`
+	DesktopMode   bool    `yaml:"desktop_mode" json:"desktop_mode"`
+	FreeLayout    bool    `yaml:"free_layout" json:"free_layout"`
+}
+
 // Service is one tile on a page.
 type Service struct {
 	ID          string            `yaml:"id" json:"id"`
@@ -114,6 +125,9 @@ type Service struct {
 	Description string            `yaml:"description,omitempty" json:"description,omitempty"`
 	Icon        string            `yaml:"icon,omitempty" json:"icon,omitempty"`
 	Page        string            `yaml:"page,omitempty" json:"page,omitempty"`
+	X           *int              `yaml:"x,omitempty" json:"x,omitempty"`
+	Y           *int              `yaml:"y,omitempty" json:"y,omitempty"`
+	ShowLabel   *bool             `yaml:"show_label,omitempty" json:"show_label,omitempty"`
 	Order       int               `yaml:"order,omitempty" json:"order,omitempty"`
 	Pin         bool              `yaml:"pin,omitempty" json:"pin,omitempty"`
 	Hidden      bool              `yaml:"hidden,omitempty" json:"hidden,omitempty"`
@@ -139,9 +153,10 @@ type Page struct {
 
 // Config is the single source of truth, stored as YAML.
 type Config struct {
-	Server    Server    `yaml:"server" json:"server"`
-	Discovery Discovery `yaml:"discovery" json:"discovery"`
-	Auth      Auth      `yaml:"auth" json:"auth"`
-	Pages     []Page    `yaml:"pages" json:"pages"`
-	Services  []Service `yaml:"services" json:"services"`
+	Server     Server     `yaml:"server" json:"server"`
+	Discovery  Discovery  `yaml:"discovery" json:"discovery"`
+	Auth       Auth       `yaml:"auth" json:"auth"`
+	Appearance Appearance `yaml:"appearance" json:"appearance"`
+	Pages      []Page     `yaml:"pages" json:"pages"`
+	Services   []Service  `yaml:"services" json:"services"`
 }
