@@ -54,6 +54,7 @@ func DefaultConfig() *model.Config {
 			TileSize:      "md",
 			DesktopMode:   false,
 			FreeLayout:    true,
+			Layout:        "desktop",
 		},
 		Pages: []model.Page{
 			{ID: "home", Name: "Home", Order: 10},
@@ -112,10 +113,19 @@ func Save(path string, cfg *model.Config) error {
 // edited manually are never overwritten.
 func Merge(cfg *model.Config, discovered []model.Service) {
 	index := map[string]int{}
+	// ports already covered by hand-curated entries; a discovered service on the
+	// same port would only be a duplicate of it
+	manualPorts := map[int]bool{}
 	for i, s := range cfg.Services {
 		index[s.ID] = i
+		if s.Managed == model.ManagedManual && s.Port != 0 {
+			manualPorts[s.Port] = true
+		}
 	}
 	for _, d := range discovered {
+		if d.Port != 0 && manualPorts[d.Port] {
+			continue
+		}
 		i, ok := index[d.ID]
 		if !ok {
 			if d.Page == "" {

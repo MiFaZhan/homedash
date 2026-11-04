@@ -10,8 +10,10 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -56,6 +58,7 @@ func (s *Server) Run(ctx context.Context) error {
 		interval = d
 	}
 	go s.scanLoop(ctx, interval)
+	go s.fetchMissingIcons()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/config", s.handleConfig)
@@ -147,11 +150,29 @@ func (s *Server) Scan() (ScanResult, error) {
 	s.mu.Lock()
 	store.Merge(s.cfg, res.Services)
 	// drop discovered entries whose service disappeared
+	// a hand-curated entry wins over anything discovered on the same port
+	manualPorts := map[int]bool{}
+	for _, svc := range s.cfg.Services {
+		if svc.Managed != model.ManagedManual {
+			continue
+		}
+		if p := svc.Port; p != 0 {
+			manualPorts[p] = true
+		} else if p := portOfURL(svc.URL); p != 0 {
+			manualPorts[p] = true
+		}
+	}
 	kept := s.cfg.Services[:0]
 	for _, svc := range s.cfg.Services {
-		if svc.Managed == model.ManagedDiscovered && !after[svc.ID] {
-			out.Removed = append(out.Removed, svc.ID)
-			continue
+		if svc.Managed == model.ManagedDiscovered {
+			if !after[svc.ID] {
+				out.Removed = append(out.Removed, svc.ID)
+				continue
+			}
+			if svc.Port != 0 && manualPorts[svc.Port] {
+				out.Removed = append(out.Removed, svc.ID)
+				continue
+			}
 		}
 		kept = append(kept, svc)
 	}
@@ -173,7 +194,35 @@ func (s *Server) Scan() (ScanResult, error) {
 	if err := s.save(); err != nil {
 		return out, err
 	}
+	go s.fetchMissingIcons()
 	return out, nil
+}
+
+// fetchMissingIcons grabs favicons for services that have no icon yet.
+func (s *Server) fetchMissingIcons() {
+	cfg := s.Config()
+	dir := filepath.Join(store.Expand(cfg.Server.DataDir), "icons")
+	changed := false
+	for _, svc := range cfg.Services {
+		// symbolic icon names and uploaded URLs are respected; only try to
+		// upgrade entries that have no real artwork yet
+		if strings.HasPrefix(svc.Icon, "/") || svc.URL == "" {
+			continue
+		}
+		name := scan.FetchFavicon(svc.URL, dir)
+		if name == "" {
+			continue
+		}
+		s.mu.Lock()
+		if i, cur := findIndex(s.cfg.Services, svc.ID); i >= 0 && !strings.HasPrefix(cur.Icon, "/") {
+			s.cfg.Services[i].Icon = "/icons/" + name
+			changed = true
+		}
+		s.mu.Unlock()
+	}
+	if changed {
+		_ = s.save()
+	}
 }
 
 func findService(list []model.Service, id string) (model.Service, bool) {
@@ -394,6 +443,7 @@ type settingsRequest struct {
 	TileSize      *string  `json:"tile_size"`
 	DesktopMode   *bool    `json:"desktop_mode"`
 	FreeLayout    *bool    `json:"free_layout"`
+	Layout        *string  `json:"layout"`
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
@@ -424,6 +474,9 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.FreeLayout != nil {
 		ap.FreeLayout = *req.FreeLayout
+	}
+	if req.Layout != nil {
+		ap.Layout = *req.Layout
 	}
 	result := *ap
 	s.mu.Unlock()
@@ -573,6 +626,19 @@ func slug(s string) string {
 		out = "item"
 	}
 	return out
+}
+
+// portOfURL extracts the explicit port of a URL, 0 when absent.
+func portOfURL(raw string) int {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return 0
+	}
+	p, err := strconv.Atoi(u.Port())
+	if err != nil {
+		return 0
+	}
+	return p
 }
 
 func firstNonEmpty(values ...string) string {

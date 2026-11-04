@@ -70,3 +70,15 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected round trip result: %+v", loaded.Services)
 	}
 }
+
+func TestMergeSkipsDuplicatePorts(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Services = []model.Service{{
+		ID: "OpenViking Studio", Name: "OpenViking Studio", URL: "http://h:1933/studio/",
+		Port: 1933, Page: "dev", Managed: model.ManagedManual,
+	}}
+	Merge(cfg, []model.Service{{ID: "openviking-1933", Name: "OpenViking", Port: 1933, Page: "auto"}})
+	if len(cfg.Services) != 1 {
+		t.Fatalf("expected the discovered duplicate to be skipped, got %d services", len(cfg.Services))
+	}
+}

@@ -4,13 +4,40 @@ const THEME_LABELS = { auto: "跟随系统", light: "浅色", dark: "深色" };
 const THEME_ICONS = { auto: "🌗", light: "☀️", dark: "🌙" };
 const THEME_KEY = "homedash.theme";
 
-const ICON_GLYPHS = {
-  database: "🗄️", monitor: "🖥️", network: "🌐", shield: "🛡️", terminal: "💻",
-  nginx: "🧱", printer: "🖨️", box: "📦", bot: "🤖", activity: "📈", chart: "📊",
-  globe: "🌍", mail: "✉️", "layout-dashboard": "🗂️", "help-circle": "❓",
-  image: "🖼️", docker: "🐳", server: "🗄️", cloud: "☁️", code: "🧑‍💻",
+/* 内置线性图标集（Lucide 风格，stroke=currentColor，24x24） */
+const SVG_ICONS = {
+  shield: '<path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3z"/>',
+  monitor: '<rect x="2.5" y="4" width="19" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/>',
+  network: '<circle cx="12" cy="5" r="2.4"/><circle cx="5" cy="19" r="2.4"/><circle cx="19" cy="19" r="2.4"/><path d="M12 7.4v4.1M6.4 16.9l3.4-3M17.6 16.9l-3.4-3"/>',
+  terminal: '<rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M7 10l3 2.6-3 2.6M13 15.5h4"/>',
+  database: '<ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/>',
+  bot: '<rect x="4" y="7.5" width="16" height="12" rx="3"/><path d="M12 3.5v4M9 13h.01M15 13h.01M9.5 16.5h5"/>',
+  activity: '<path d="M3 12h4l2.5-6.5 4 13L16.5 12H21"/>',
+  chart: '<path d="M4 20V4M4 20h16"/><rect x="7.5" y="12" width="3" height="5"/><rect x="13" y="8" width="3" height="9"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.7 5.3 3.7 8.5s-1.3 6.2-3.7 8.5c-2.4-2.3-3.7-5.3-3.7-8.5S9.6 5.8 12 3.5z"/>',
+  mail: '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M3 7l9 6.5L21 7"/>',
+  nginx: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>',
+  printer: '<path d="M6.5 9V4h11v5"/><rect x="3.5" y="9" width="17" height="7.5" rx="2"/><path d="M7 16.5h10V21H7z"/>',
+  box: '<path d="M12 3l8 4.3v9.4L12 21l-8-4.3V7.3L12 3z"/><path d="M4 7.3l8 4.4 8-4.4M12 11.7V21"/>',
+  cloud: '<path d="M7 18.5h10.2a3.8 3.8 0 0 0 .4-7.6A5.6 5.6 0 0 0 6.9 9.5 4.5 4.5 0 0 0 7 18.5z"/>',
+  docker: '<path d="M3 12.5h13.5c1.6 0 3-1.3 3-3 1.8 0 3 1.3 2.7 3.4-.4 3.6-3.6 6.1-7.7 6.1H7.5A4.5 4.5 0 0 1 3 14.5z"/><path d="M7 9.5V7M10.5 9.5V7M14 9.5V7"/>',
+  server: '<rect x="3" y="4" width="18" height="6.5" rx="2"/><rect x="3" y="13.5" width="18" height="6.5" rx="2"/><path d="M7 7.2h.01M7 16.7h.01"/>',
+  code: '<path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/>',
+  wrench: '<path d="M15.5 3.5a5 5 0 0 0-4.6 7L4 17.4 6.6 20l6.9-6.9a5 5 0 0 0 6.6-6.2l-3 3-2.4-.6-.6-2.4 3-3c-.5-.2-1-.4-1.6-.4z"/>',
+  home: '<path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>',
+  image: '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5"/>',
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6v.4"/><path d="M12 16.8h.01"/>',
+  layout: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M9.5 9v11"/>',
 };
-const PAGE_GLYPHS = ["🏠", "🧑‍💻", "🛠️", "🌍", "🔎", "📦", "🧪", "⭐"];
+
+function svgIcon(name, size = 40) {
+  const body = SVG_ICONS[name];
+  if (!body) return null;
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none"
+     stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+}
+
+const PAGE_ICONS = ["home", "code", "wrench", "globe", "layout", "box", "activity", "chart"];
 
 const state = {
   appearance: {
@@ -79,11 +106,8 @@ function tileGradient(name) {
   return [`hsl(${h} 68% 56%)`, `hsl(${(h + 42) % 360} 62% 40%)`];
 }
 
-function iconGlyph(icon) {
-  if (!icon) return "🔹";
-  if (icon.startsWith("/")) return null;
-  if (/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(icon)) return icon;
-  return ICON_GLYPHS[icon] || "🔹";
+function isEmoji(str) {
+  return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(str || "");
 }
 
 const runtimeGlyph = {
@@ -108,6 +132,7 @@ function applyAppearance() {
     wall.style.filter = "";
   }
   document.body.classList.toggle("desktop-mode", !!ap.desktop_mode);
+  document.body.classList.toggle("layout-desktop", (ap.layout || "desktop") === "desktop");
   document.documentElement.style.setProperty("--tile", (TILE_SIZES[ap.tile_size] || 72) + "px");
 }
 
@@ -118,7 +143,7 @@ function renderRail() {
   rail.innerHTML = "";
   state.pages.forEach((p, i) => {
     const btn = el("button", "rail-btn" + (i === state.page ? " active" : ""));
-    btn.innerHTML = PAGE_GLYPHS[i % PAGE_GLYPHS.length];
+    btn.innerHTML = svgIcon(PAGE_ICONS[i % PAGE_ICONS.length], 20) || "•";
     btn.appendChild(el("span", "rail-label", p.name));
     btn.onclick = () => { state.page = i; location.hash = p.id; render(); };
     if (state.edit) btn.ondblclick = () => openPageDrawer(p);
@@ -127,6 +152,7 @@ function renderRail() {
   if (state.edit) {
     rail.appendChild(el("div", "rail-sep"));
     const add = el("button", "rail-btn", "＋");
+    add.style.fontSize = "18px";
     add.appendChild(el("span", "rail-label", "新建页面"));
     add.onclick = () => openPageDrawer(null);
     rail.appendChild(add);
@@ -151,144 +177,84 @@ function renderCanvas() {
   $("#empty").classList.toggle("hidden", list.length > 0);
   if (!list.length) return;
 
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  const tile = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--tile"), 10) || 72;
-  const railSpace = state.appearance.desktop_mode ? 40 : 110;
-  const usable = Math.max(200, w - railSpace - 40);
-  const gap = Math.round(tile * (usable < 520 ? 0.28 : 0.47));
-  const maxSpread = Math.max(tile, usable - tile - 40);
-  const perCluster = Math.max(2, Math.min(7, Math.floor(maxSpread / (tile + gap)) + 1));
-  const free = state.appearance.free_layout !== false;
+  const wrap = el("div", "board");
+  const pageTitle = el("div", "board-title");
+  pageTitle.appendChild(el("h1", "", currentPage()?.name || "服务"));
+  pageTitle.appendChild(el("span", "board-count", `${list.length} 个服务`));
+  wrap.appendChild(pageTitle);
 
-  const placed = list.filter((s) => free && s.x !== null && s.x !== undefined && s.y !== null && s.y !== undefined);
-  const auto = list.filter((s) => !placed.includes(s));
-
-  // 已固定位置的图标
-  placed.forEach((svc) => {
-    const node = tileNode(svc, svc.x, svc.y);
-    node.classList.add("pinned");
-    canvas.appendChild(node);
-  });
-
-  // 自动排布的图标（沿弧线成组）
-  const clusters = [];
-  for (let i = 0; i < auto.length; i += perCluster) clusters.push(auto.slice(i, i + perCluster));
-  const bandH = tile + 190;
-  const cols = w < 1180 ? 1 : 2;
-
-  clusters.forEach((group, ci) => {
-    const col = cols === 1 ? 0 : ci % cols;
-    const row = cols === 1 ? ci : Math.floor(ci / cols);
-    const spread = Math.min((group.length - 1) * (tile + gap), maxSpread);
-    const clusterW = spread + tile + 110;
-    const usable = w - railSpace;
-    const cx = clusters.length === 1
-      ? railSpace + (w - railSpace) / 2
-      : railSpace + (w - railSpace) * (cols === 1 ? 0.5 : 0.26 + col * 0.48);
-    const cy = Math.max(150, h * 0.42) + row * bandH;
-
-    const blob = el("div", "cluster");
-    blob.style.width = `${clusterW}px`;
-    blob.style.height = `${tile + 140}px`;
-    blob.style.left = `${cx - clusterW / 2}px`;
-    blob.style.top = `${cy - tile / 2 - 66}px`;
-    blob.style.transform = `rotate(${(ci % 2 ? 1.3 : -1.1)}deg)`;
-    canvas.appendChild(blob);
-
-    group.forEach((svc, i) => {
-      const t = group.length === 1 ? 0 : (i / (group.length - 1)) - 0.5;
-      const x = cx + t * spread;
-      const y = cy + Math.pow(Math.abs(t), 1.7) * 140 + Math.sin(i * 1.6) * 5;
-      canvas.appendChild(tileNode(svc, x - tile / 2, y - tile / 2));
-    });
-  });
+  const grid = el("div", "board-grid");
+  const tilePx = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--tile"), 10) || 86;
+  const avail = canvas.clientWidth - 220;
+  const maxCols = Math.max(2, Math.floor(avail / (tilePx + 18)));
+  const cols = Math.min(list.length, Math.min(maxCols, 8));
+  grid.style.gridTemplateColumns = `repeat(${cols}, ${tilePx + 42}px)`;
+  list.forEach((svc) => grid.appendChild(tileNode(svc)));
+  wrap.appendChild(grid);
+  canvas.appendChild(wrap);
 
   if (state.edit) enableDragAndDrop(canvas);
   if (state.appearance.free_layout !== false) enableFreeDrag(canvas);
 }
 
-function tileNode(svc, left, top) {
+function tileNode(svc) {
   const node = el("div", "tile");
-  node.style.left = `${left}px`;
-  node.style.top = `${top}px`;
   node.draggable = state.edit;
   node.dataset.id = svc.id;
 
   const inner = el("div", "tile-inner");
-  const [c1, c2] = tileGradient(svc.name);
-  inner.style.setProperty("--c1", c1);
-  inner.style.setProperty("--c2", c2);
-  const glyph = iconGlyph(svc.icon);
-  if (glyph === null) {
+  const icon = svc.icon || "";
+  if (icon.startsWith("/")) {
     const img = document.createElement("img");
-    img.src = svc.icon;
+    img.src = icon;
     img.alt = svc.name;
-    img.onerror = () => { inner.textContent = "🔹"; };
+    img.loading = "lazy";
+    img.onerror = () => { inner.innerHTML = letterMark(svc.name); };
     inner.appendChild(img);
+    inner.classList.add("has-art");
+  } else if (isEmoji(icon)) {
+    inner.textContent = icon;
+    inner.classList.add("has-emoji");
+  } else if (SVG_ICONS[icon]) {
+    inner.innerHTML = svgIcon(icon, 38);
   } else {
-    inner.textContent = glyph;
+    inner.innerHTML = letterMark(svc.name);
   }
+
+  if (svc.status === "offline") inner.classList.add("offline");
   node.appendChild(inner);
 
-  const dot = el("span", "badge-dot dot-" + (svc.status || "unknown"));
-  node.appendChild(dot);
+  node.appendChild(el("span", "badge-dot dot-" + (svc.status || "unknown")));
 
   if (state.edit) {
-    const rt = el("span", "rt rt-" + (svc.runtime || "unknown"), runtimeGlyph[svc.runtime || "unknown"]);
-    node.appendChild(rt);
+    node.appendChild(el("span", "rt rt-" + (svc.runtime || "unknown"),
+      runtimeGlyph[svc.runtime || "unknown"]));
   }
 
   const label = el("span", "tile-label", svc.name);
-  const showLabel = svc.show_label === true || (svc.show_label !== false && state.appearance.show_labels);
-  if (showLabel) node.classList.add("show-label");
+  if (svc.show_label === true || (svc.show_label !== false && state.appearance.show_labels)) {
+    node.classList.add("show-label");
+  }
   node.appendChild(label);
 
   node.onclick = () => {
     if (state.edit) { openDrawer(svc); return; }
     window.open(svc.url, "_blank", "noopener");
   };
-  node.title = `${svc.name}${svc.description ? " — " + svc.description : ""}`;
+  node.title = `${svc.name}${svc.description ? " — " + svc.description : ""}\n${svc.url || ""}`;
   return node;
 }
 
-function enableFreeDrag(canvas) {
-  canvas.querySelectorAll(".tile").forEach((node) => {
-    node.onmousedown = (e) => {
-      if (state.edit) return;           // 编辑模式用排序拖拽
-      const svc = state.services.find((s) => s.id === node.dataset.id);
-      if (!svc) return;
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const originLeft = node.offsetLeft;
-      const originTop = node.offsetTop;
-      let moved = false;
-
-      const move = (ev) => {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
-        node.style.left = `${originLeft + dx}px`;
-        node.style.top = `${originTop + dy}px`;
-        node.style.zIndex = "5";
-      };
-      const up = async () => {
-        document.removeEventListener("mousemove", move);
-        document.removeEventListener("mouseup", up);
-        node.style.zIndex = "";
-        if (!moved) return;
-        const x = Math.round(node.offsetLeft);
-        const y = Math.round(node.offsetTop);
-        node.classList.add("pinned");
-        await api(`/api/services/${encodeURIComponent(svc.id)}`, "PUT",
-          Object.assign({}, svc, { x, y }));
-        await load();
-      };
-      document.addEventListener("mousemove", move);
-      document.addEventListener("mouseup", up);
-    };
-  });
+/* letterMark 生成字母/首字标记，用于没有图标的服务 */
+function letterMark(name) {
+  const text = (name || "?").trim();
+  const mark = /[\u4e00-\u9fa5]/.test(text) ? text[0] : text.slice(0, 1).toUpperCase();
+  const h = hashHue(text);
+  return `<span class="letter" style="background:linear-gradient(145deg, hsl(${h} 62% 55%), hsl(${(h + 40) % 360} 58% 38%))">${mark}</span>`;
 }
+
+/* 非编辑模式下点击即打开；拖动排序统一走编辑模式 */
+function enableFreeDrag() { /* reserved for free-positioning of a future release */ }
 
 function enableDragAndDrop(canvas) {
   let dragged = null;
@@ -431,6 +397,7 @@ function openSettings() {
   $("#optFree").checked = ap.free_layout !== false;
   $("#optDesktop").checked = !!ap.desktop_mode;
   $("#optSize").value = ap.tile_size || "md";
+  $("#optLayout").value = ap.layout || "desktop";
   $("#wBlur").value = ap.wallpaper_blur || 0;
   $("#wDim").value = Math.round((ap.wallpaper_dim ?? 0.35) * 100);
   $("#wCurrent").textContent = ap.wallpaper ? "当前：" + ap.wallpaper.split("/").pop() : "当前：默认渐变";
@@ -446,6 +413,7 @@ async function saveSettings() {
     free_layout: $("#optFree").checked,
     desktop_mode: $("#optDesktop").checked,
     tile_size: $("#optSize").value,
+    layout: $("#optLayout").value,
   };
   state.appearance = Object.assign(state.appearance, payload);
   applyAppearance();

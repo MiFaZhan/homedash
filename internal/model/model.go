@@ -115,6 +115,7 @@ type Appearance struct {
 	TileSize      string  `yaml:"tile_size" json:"tile_size"`
 	DesktopMode   bool    `yaml:"desktop_mode" json:"desktop_mode"`
 	FreeLayout    bool    `yaml:"free_layout" json:"free_layout"`
+	Layout        string  `yaml:"layout" json:"layout"`
 }
 
 // Service is one tile on a page.
