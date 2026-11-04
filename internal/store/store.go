@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -15,15 +16,15 @@ import (
 // DefaultPath is the canonical location of the configuration file.
 const DefaultPath = "~/.config/homedash/config.yaml"
 
-// Expand resolves a leading ~ to the user home directory.
+// Expand resolves a leading ~ and environment variables in a path.
 func Expand(path string) string {
 	if path == "" {
 		path = DefaultPath
 	}
-	if path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			path = filepath.Join(home, path[1:])
+	path = os.ExpandEnv(path)
+	if strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			path = filepath.Join(home, path[2:])
 		}
 	}
 	return path
@@ -32,29 +33,45 @@ func Expand(path string) string {
 // DefaultConfig returns the configuration used before the user edits anything.
 func DefaultConfig() *model.Config {
 	return &model.Config{
+		Server: model.Server{
+			Listen:        "127.0.0.1:3010",
+			DataDir:       "~/.local/share/homedash",
+			ScanInterval:  "60s",
+			PreferredHost: "",
+			ExternalURL:   "",
+		},
+		Discovery: model.Discovery{
+			IncludeLocal: false,
+			Probe:        true,
+			PortsTable:   "",
+		},
+		Auth: model.Auth{Enabled: false, User: "admin"},
 		Pages: []model.Page{
-			{ID: "home", Name: "首页", Order: 10},
-			{ID: "dev", Name: "开发", Order: 20},
-			{ID: "ops", Name: "运维", Order: 30},
-			{ID: "external", Name: "外部", Order: 40},
-			{ID: "auto", Name: "自动发现", Order: 50},
+			{ID: "home", Name: "Home", Order: 10},
+			{ID: "dev", Name: "Development", Order: 20},
+			{ID: "ops", Name: "Operations", Order: 30},
+			{ID: "external", Name: "External", Order: 40},
+			{ID: "auto", Name: "Discovered", Order: 50},
 		},
 	}
 }
 
-// Load reads the configuration, creating a default one when it does not exist.
+// Load reads the configuration, returning defaults when the file is missing.
 func Load(path string) (*model.Config, error) {
 	path = Expand(path)
+	cfg := DefaultConfig()
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return DefaultConfig(), nil
+		return cfg, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	cfg := DefaultConfig()
 	if err := yaml.Unmarshal(b, cfg); err != nil {
-		return nil, fmt.Errorf("解析配置失败 %s: %w", path, err)
+		return nil, fmt.Errorf("cannot parse %s: %w", path, err)
+	}
+	if len(cfg.Pages) == 0 {
+		cfg.Pages = DefaultConfig().Pages
 	}
 	return cfg, nil
 }
@@ -92,11 +109,13 @@ func Merge(cfg *model.Config, discovered []model.Service) {
 	for _, d := range discovered {
 		i, ok := index[d.ID]
 		if !ok {
+			if d.Page == "" {
+				d.Page = "auto"
+			}
 			cfg.Services = append(cfg.Services, d)
 			continue
 		}
 		cur := &cfg.Services[i]
-		// refresh volatile fields only
 		cur.Status = d.Status
 		cur.LatencyMS = d.LatencyMS
 		cur.HTTPStatus = d.HTTPStatus
@@ -119,4 +138,36 @@ func Merge(cfg *model.Config, discovered []model.Service) {
 			cur.Page = d.Page
 		}
 	}
+}
+
+// Find returns the service with the given id.
+func Find(cfg *model.Config, id string) (int, *model.Service) {
+	for i := range cfg.Services {
+		if cfg.Services[i].ID == id {
+			return i, &cfg.Services[i]
+		}
+	}
+	return -1, nil
+}
+
+// Upsert creates or updates a service, marking it as manually managed.
+func Upsert(cfg *model.Config, svc model.Service) {
+	if i, _ := Find(cfg, svc.ID); i >= 0 {
+		cur := &cfg.Services[i]
+		*cur = svc
+		cur.Managed = model.ManagedManual
+		return
+	}
+	svc.Managed = model.ManagedManual
+	cfg.Services = append(cfg.Services, svc)
+}
+
+// Remove deletes a service by id and reports whether it existed.
+func Remove(cfg *model.Config, id string) bool {
+	i, _ := Find(cfg, id)
+	if i < 0 {
+		return false
+	}
+	cfg.Services = append(cfg.Services[:i], cfg.Services[i+1:]...)
+	return true
 }

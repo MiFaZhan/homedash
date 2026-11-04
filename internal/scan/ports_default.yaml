@@ -1,0 +1,89 @@
+ports:
+  22:
+    name: SSH
+    description: Secure shell
+    icon: terminal
+    page: ops
+    hidden: true
+  25:
+    name: SMTP
+    icon: mail
+    page: ops
+    hidden: true
+  53:
+    name: DNS
+    icon: globe
+    page: ops
+    hidden: true
+  80:
+    name: HTTP
+    description: Plain HTTP entry
+    icon: nginx
+    page: ops
+  443:
+    name: HTTPS
+    description: TLS entry
+    icon: shield
+    page: ops
+  631:
+    name: CUPS
+    description: Printing
+    icon: printer
+    page: ops
+    hidden: true
+  3000:
+    name: Web app
+    icon: layout-dashboard
+    page: home
+  3306:
+    name: MySQL
+    icon: database
+    page: dev
+    hidden: true
+  3389:
+    name: RDP
+    description: Remote desktop
+    icon: monitor
+    page: ops
+  5432:
+    name: PostgreSQL
+    icon: database
+    page: dev
+    hidden: true
+  5900:
+    name: VNC
+    icon: monitor
+    page: ops
+    hidden: true
+  6379:
+    name: Redis
+    icon: database
+    page: dev
+    hidden: true
+  8000:
+    name: App :8000
+    icon: box
+    page: dev
+  8080:
+    name: App :8080
+    icon: box
+    page: dev
+  8443:
+    name: App :8443
+    icon: box
+    page: dev
+  9090:
+    name: App :9090
+    icon: box
+    page: dev
+  11434:
+    name: Ollama
+    description: Local LLM runtime
+    icon: bot
+    page: dev
+    hidden: true
+  27017:
+    name: MongoDB
+    icon: database
+    page: dev
+    hidden: true

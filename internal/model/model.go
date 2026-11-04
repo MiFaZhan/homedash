@@ -1,17 +1,18 @@
-// Package model holds the on-disk configuration structures of homedash.
+// Package model holds the configuration structures of homedash.
 package model
 
 import "time"
 
-// Runtime classifies how a service is executed on this machine.
+// Runtime classifies how a service is executed on the machine.
 const (
-	RuntimeDocker  = "docker"
-	RuntimeSystemd = "systemd"
-	RuntimeProcess = "process"
-	RuntimeUnknown = "unknown"
+	RuntimeDocker    = "docker"
+	RuntimeSystemd   = "systemd"
+	RuntimeProcess   = "process"
+	RuntimeTailscale = "tailscale"
+	RuntimeUnknown   = "unknown"
 )
 
-// Managed marks the origin of an entry: created by the user or found by the scanner.
+// Managed marks the origin of an entry.
 const (
 	ManagedManual     = "manual"
 	ManagedDiscovered = "discovered"
@@ -23,6 +24,30 @@ const (
 	StatusOffline = "offline"
 	StatusUnknown = "unknown"
 )
+
+// Server holds the HTTP server settings.
+type Server struct {
+	Listen        string `yaml:"listen" json:"listen"`
+	DataDir       string `yaml:"data_dir" json:"data_dir"`
+	ScanInterval  string `yaml:"scan_interval" json:"scan_interval"`
+	PreferredHost string `yaml:"preferred_host" json:"preferred_host"`
+	ExternalURL   string `yaml:"external_url" json:"external_url"`
+}
+
+// Discovery controls the automatic service discovery.
+type Discovery struct {
+	IncludeLocal bool   `yaml:"include_local" json:"include_local"`
+	Probe        bool   `yaml:"probe" json:"probe"`
+	HidePorts    []int  `yaml:"hide_ports" json:"hide_ports"`
+	PortsTable   string `yaml:"ports_table" json:"ports_table"`
+}
+
+// Auth holds the optional password protection.
+type Auth struct {
+	Enabled      bool   `yaml:"enabled" json:"enabled"`
+	User         string `yaml:"user" json:"user"`
+	PasswordHash string `yaml:"password_hash" json:"-"`
+}
 
 // Service is one tile on a page.
 type Service struct {
@@ -46,8 +71,8 @@ type Service struct {
 	LastSeen    time.Time         `yaml:"last_seen" json:"last_seen"`
 }
 
-// Page is a tab of the dashboard, in the spirit of WeTab: each page carries its
-// own set of tiles instead of grouping tiles inside one long page.
+// Page is a tab of the dashboard. The dashboard shows one page at a time and
+// the user can flip between pages, in the spirit of WeTab.
 type Page struct {
 	ID    string `yaml:"id" json:"id"`
 	Name  string `yaml:"name" json:"name"`
@@ -55,16 +80,11 @@ type Page struct {
 	Order int    `yaml:"order,omitempty" json:"order,omitempty"`
 }
 
-// Auth holds the optional password protection settings.
-type Auth struct {
-	Enabled  bool   `yaml:"enabled" json:"enabled"`
-	User     string `yaml:"user" json:"user"`
-	Password string `yaml:"password_hash,omitempty" json:"-"`
-}
-
 // Config is the single source of truth, stored as YAML.
 type Config struct {
-	Pages    []Page    `yaml:"pages" json:"pages"`
-	Services []Service `yaml:"services" json:"services"`
-	Auth     Auth      `yaml:"auth" json:"auth"`
+	Server    Server    `yaml:"server" json:"server"`
+	Discovery Discovery `yaml:"discovery" json:"discovery"`
+	Auth      Auth      `yaml:"auth" json:"auth"`
+	Pages     []Page    `yaml:"pages" json:"pages"`
+	Services  []Service `yaml:"services" json:"services"`
 }

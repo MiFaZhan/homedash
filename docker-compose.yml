@@ -1,0 +1,18 @@
+services:
+  homedash:
+    build: .
+    image: homedash:latest
+    container_name: homedash
+    restart: unless-stopped
+    # host networking + host PID namespace so the scanner sees the real
+    # interfaces and the real process table of the host
+    network_mode: host
+    pid: host
+    environment:
+      HOMEDASH_CONFIG: /config/config.yaml
+    volumes:
+      - ./config:/config
+      - ./data:/data
+      # docker socket is optional, it enables the "which container" details
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["serve", "--listen", "0.0.0.0:3010"]

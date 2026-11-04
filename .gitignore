@@ -1,2 +1,6 @@
-homedash
+/homedash
+/dist/
+/config/
+/data/
 *.bak.*
+.DS_Store

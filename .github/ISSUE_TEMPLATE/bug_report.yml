@@ -1,0 +1,28 @@
+name: Bug report
+description: 报告一个扫描或展示问题
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      value: |
+        1. 运行 ...
+        2. 打开 ...
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      value: |
+        - OS:
+        - homedash version:
+        - 部署方式（裸机 / docker）:

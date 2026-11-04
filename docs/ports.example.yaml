@@ -1,0 +1,11 @@
+# 端口归并表示例：复制到 ~/.local/share/homedash/ports.yaml 后生效
+ports:
+  8081:
+    name: Grafana
+    description: 可观测性面板
+    icon: chart
+    page: ops
+  9000:
+    name: 内部调试端口
+    icon: terminal
+    hidden: true

@@ -16,6 +16,7 @@ type Options struct {
 	IncludeLocal bool   // also collect 127.0.0.1 listeners
 	Probe        bool   // run HTTP health checks
 	PortsTable   string // optional ports.yaml
+	HidePorts    []int  // ports the user never wants to see
 	SelfPort     int    // our own port, skipped
 	Host         string // preferred host for building URLs
 }
@@ -89,6 +90,10 @@ func Scan(opts Options) (Result, error) {
 		}
 
 		hint, hasHint := table[s.Port]
+		if containsInt(opts.HidePorts, s.Port) {
+			res.Filtered = append(res.Filtered, Filtered{Port: s.Port, Addr: s.Addr, Reason: "用户隐藏"})
+			continue
+		}
 		if reason, ok := proxies[s.Port]; ok && !hasHint {
 			res.Filtered = append(res.Filtered, Filtered{Port: s.Port, Addr: s.Addr, Reason: "反代端口（" + reason + "）"})
 			continue
@@ -176,6 +181,15 @@ func Scan(opts Options) (Result, error) {
 		return res.Services[i].Name < res.Services[j].Name
 	})
 	return res, nil
+}
+
+func containsInt(list []int, v int) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldProbe(hint PortHint) bool {

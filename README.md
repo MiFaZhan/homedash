@@ -1,54 +1,186 @@
+<div align="center">
+
 # homedash
 
-本机服务导航盘：自动发现这台机器上在跑的服务，网页上直接编辑图标，最后通过 Tailscale（或可选的公网方式）对外提供访问。
+**自托管的本机服务导航盘** —— 自动发现这台机器上正在跑的服务，用网页把它们整理成可以翻页的卡片墙。
 
-## 现状（M1：扫描器）
+[English](README.en.md) · [文档](docs/) · [贡献指南](CONTRIBUTING.md)
 
-```bash
-cd ~/services/homedash
-go build -o homedash ./cmd/homedash
+</div>
 
-./homedash scan --dry-run          # 只打印，不写文件
-./homedash scan --dry-run --probe=false   # 跳过健康探测
-./homedash scan                     # 写入 ~/.config/homedash/config.yaml
-```
+---
 
-常用参数：
+## 它解决什么问题
 
-| 参数 | 说明 |
-|---|---|
-| `--probe` | HTTP 健康探测（默认开），产出 online/offline 与延迟 |
-| `--include-local` | 同时收录只监听 127.0.0.1 的内部服务 |
-| `--ports-table` | 指定端口归并表（默认内置，可指向 `config/ports.yaml`） |
-| `--out` | 配置文件路径，默认 `~/.config/homedash/config.yaml` |
-| `--self-port` | 跳过自身占用的端口 |
+家里/工位上一台 Linux 机器，跑着十几个服务：OpenViking、Glances、noVNC、几个 MCP 网关、偶尔还有临时起的调试端口。
+没人记得每个东西的地址和端口，于是每次都要 `ss -ltnp` 翻一遍。
 
-## 运行形态识别
+homedash 做三件事：
 
-| 徽标 | 判定依据 |
-|---|---|
-| 🐳 Docker | 进程 cgroup 含 `docker-<64hex>.scope` / `kubepods` / `containerd`，并用 Docker API 补容器名与镜像 |
-| ⚙️ systemd | cgroup 含 `*.service`（`systemctl show` 取单元描述，用户单元自动回退 `systemctl --user`） |
-| 🖥️ 宿主机进程 | 其余裸进程 / 自编译二进制 / 用户级脚本，附可执行文件路径与命令行 |
-| 🔗 Tailscale | 端口由 `tailscale serve` 代理，附上游目标 |
-| ❓ 未知 | root 进程且无法从 `/proc` 读取时，用 nginx 配置与 systemd 单元兜底匹配 |
+1. **自动发现**：扫描本机监听端口，反查属主进程，识别它是 Docker 容器、systemd 服务、宿主机裸进程还是 Tailscale 代理；
+2. **可编辑**：在浏览器里增删改图标、名称、地址、归属页面、顺序，配置落盘为一份可进 git 的 YAML；
+3. **可暴露**：默认只监听回环地址，用 Tailscale（`tailscale serve`）或 Cloudflare Tunnel 对外提供访问。
 
-## 目录
+## 特性
 
-```
-cmd/homedash/        CLI：scan / serve
-internal/scan/       采集：ports / classify / systemd / docker / proxy / rootunits / probe / noise
-internal/model/      数据模型（Service / Page / Config）
-internal/store/      YAML 读写、原子写与备份、manual 优先合并
-config/ports.yaml    端口归并表（名称/图标/页面/隐藏）
-```
+- **运行形态徽标**：🐳 Docker / ⚙️ systemd / 🖥️ 宿主机进程 / 🔗 Tailscale，一眼分清"容器跑的"还是"装在本机的"
+- **多页而非分组**：像 WeTab 一样一页一场景（首页 / 开发 / 运维 / 外部 / 自动发现），左右翻页，页面可自建
+- **健康状态**：定时 HTTP 探测，卡片上直接显示 online/offline 与延迟
+- **零构建前端**：原生 JS + CSS，单二进制内嵌静态资源，`go install` 即用
+- **配置即真相**：`config.yaml` 是唯一数据源，界面上的每一次编辑都原子写盘并保留备份
+- **可选认证**：默认关闭；开启后为 HTTP Basic Auth（bcrypt），公网暴露时建议必开
+- **Docker 友好**：容器内扫描靠挂载 `/proc` 与 `/var/run/docker.sock`，compose 文件开箱即用
 
-## 页面模型
+## 快速开始
 
-参考 WeTab：**一页一场景**，而不是一页里分组。`pages` 在配置里定义（默认 `首页 / 开发 / 运维 / 外部 / 自动发现`），每个服务归属一页；前端做成可左右翻页的卡片墙。
-
-## 测试
+### 二进制
 
 ```bash
-go test ./...
+go install github.com/mifazhan/homedash@latest   # 或从 Releases 下载
+homedash init                                    # 生成 ~/.config/homedash/config.yaml
+homedash serve                                   # 启动，默认 127.0.0.1:3010
 ```
+
+打开 <http://127.0.0.1:3010> 即可看到本机服务。
+
+### Docker Compose
+
+```bash
+git clone https://github.com/mifazhan/homedash && cd homedash
+docker compose up -d
+```
+
+compose 里做了两件关键事：`network_mode: host`（拿到真实网卡地址）、挂载 `/proc` 与 `docker.sock`（识别宿主机与容器服务）。
+
+### systemd（用户级）
+
+```ini
+# ~/.config/systemd/user/homedash.service
+[Unit]
+Description=homedash dashboard
+After=network-online.target
+
+[Service]
+Environment=HOMEDASH_CONFIG=%h/.config/homedash/config.yaml
+ExecStart=%h/.local/bin/homedash serve
+Restart=always
+
+[Install]
+WantedBy=default.target
+```
+
+## 配置
+
+`~/.config/homedash/config.yaml`：
+
+```yaml
+server:
+  listen: 127.0.0.1:3010
+  data_dir: ~/.local/share/homedash
+  scan_interval: 60s
+  preferred_host: ""      # 留空自动选择（Tailscale IP 优先，其次内网 IPv4）
+  external_url: ""
+
+discovery:
+  include_local: false    # 是否收录只监听 127.0.0.1 的服务
+  probe: true             # 是否做 HTTP 健康探测
+  hide_ports: []          # 永远不显示的端口
+  ports_table: ""         # 自定义端口归并表，默认读 <data_dir>/ports.yaml
+
+auth:
+  enabled: false
+  user: admin
+  password_hash: ""       # homedash hash-password <password> 生成
+
+pages:
+  - id: home
+    name: 首页
+    order: 10
+
+services:
+  - id: openviking
+    name: OpenViking
+    url: http://100.x.x.x:1933/
+    page: home
+    icon: database
+    managed: manual        # manual 的条目不会被自动扫描覆盖
+```
+
+端口归并表（`~/.local/share/homedash/ports.yaml`）可以把"端口 8081"翻译成"Grafana"：
+
+```yaml
+ports:
+  8081:
+    name: Grafana
+    description: 可观测性面板
+    icon: chart
+    page: ops
+  9000:
+    name: 内部调试端口
+    hidden: true
+```
+
+## 对外暴露
+
+### 方式 A：Tailscale（推荐）
+
+```bash
+tailscale serve --bg --https=443 http://127.0.0.1:3010
+```
+
+证书由 Tailscale 自动签发，访问控制交给 tailnet ACL，homedash 自身可以不开认证。
+
+### 方式 B：公网
+
+homedash 默认只监听回环地址，公网暴露请用反向代理或隧道：
+
+```bash
+# Cloudflare Tunnel
+cloudflared tunnel run --url http://127.0.0.1:3010
+
+# 或 nginx + Let's Encrypt 反代到 127.0.0.1:3010
+```
+
+**公网暴露时必须开启 `auth.enabled`。**
+
+## HTTP API
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/config` | 页面与服务全量配置 |
+| POST | `/api/scan` | 立即触发一次扫描 |
+| POST | `/api/services` | 新增服务 |
+| PUT | `/api/services/{id}` | 更新服务 |
+| DELETE | `/api/services/{id}` | 删除服务 |
+| POST | `/api/services/reorder` | 批量排序与换页 |
+| POST | `/api/pages` | 新增/更新页面 |
+| DELETE | `/api/pages/{id}` | 删除页面（服务移到自动发现页） |
+| POST | `/api/icons` | 上传图标（multipart，字段 `file`） |
+
+## 扫描原理
+
+| 数据源 | 采集内容 |
+|---|---|
+| `/proc/net/tcp{,6}` + `/proc/*/fd` | 监听端口与属主进程（无需 root，除少数特权进程） |
+| `/proc/<pid>/cgroup` | 运行形态判定：Docker / systemd / 宿主机进程 |
+| `systemctl show` | 单元描述、状态（用户单元自动回退 `--user`） |
+| Docker API | 容器名与镜像（需要 `docker.sock`） |
+| nginx / caddy 配置 | 反代端口归并，避免重复条目 |
+| `tailscale serve status` | 标出 Tailscale 代理的端口与其上游 |
+
+细节见 [docs/SCANNING.md](docs/SCANNING.md)。
+
+## 开发
+
+```bash
+git clone https://github.com/mifazhan/homedash && cd homedash
+make test      # go test ./...
+make build     # 生成 ./homedash
+make run       # 本地跑起来
+```
+
+前端是原生 JS，**没有构建步骤**：改 `internal/web/assets/*` 重新 `make build` 即可。
+
+## License
+
+[MIT](LICENSE)

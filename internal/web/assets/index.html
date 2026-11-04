@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>homedash</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◆</span>
+    <span class="title">homedash</span>
+  </div>
+  <input id="search" class="search" type="search" placeholder="搜索服务 / 过滤（/ 聚焦）" autocomplete="off">
+  <div class="actions">
+    <span id="runtimeFilters" class="chips"></span>
+    <button id="scanBtn" class="btn" title="立即扫描">扫描</button>
+    <button id="editBtn" class="btn" title="编辑模式">编辑</button>
+  </div>
+</header>
+
+<nav class="pager">
+  <button id="prevPage" class="pager-btn" aria-label="上一页">‹</button>
+  <div id="tabs" class="tabs"></div>
+  <button id="nextPage" class="pager-btn" aria-label="下一页">›</button>
+</nav>
+
+<main id="grid" class="grid"></main>
+
+<div id="empty" class="empty hidden">
+  <p>这一页还没有服务。</p>
+  <button id="addBtn" class="btn primary">添加服务</button>
+</div>
+
+<aside id="drawer" class="drawer hidden">
+  <div class="drawer-head">
+    <h2 id="drawerTitle">编辑服务</h2>
+    <button id="closeDrawer" class="btn ghost">✕</button>
+  </div>
+  <div class="drawer-body">
+    <label>名称<input id="fName" type="text"></label>
+    <label>地址<input id="fUrl" type="text" placeholder="http://host:port"></label>
+    <label>描述<input id="fDesc" type="text"></label>
+    <label>图标<input id="fIcon" type="text" placeholder="图标名或 emoji"></label>
+    <label>所属页面<select id="fPage"></select></label>
+    <label>排序<input id="fOrder" type="number" step="10"></label>
+    <div class="row">
+      <label class="check"><input id="fHidden" type="checkbox">隐藏</label>
+      <label class="check"><input id="fPin" type="checkbox">置顶</label>
+    </div>
+    <div id="detailBox" class="detail"></div>
+    <div class="row">
+      <input id="fUpload" type="file" accept=".png,.svg,.ico,.jpg,.jpeg" hidden>
+      <button id="uploadBtn" class="btn ghost">上传图标</button>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button id="deleteBtn" class="btn danger">删除</button>
+    <button id="saveBtn" class="btn primary">保存</button>
+  </div>
+</aside>
+
+<aside id="pageDrawer" class="drawer hidden">
+  <div class="drawer-head">
+    <h2>页面</h2>
+    <button id="closePageDrawer" class="btn ghost">✕</button>
+  </div>
+  <div class="drawer-body">
+    <label>页面名称<input id="pName" type="text"></label>
+    <label>页面 ID<input id="pId" type="text" placeholder="留空自动生成"></label>
+    <div id="pageList" class="page-list"></div>
+  </div>
+  <div class="drawer-foot">
+    <button id="addPageBtn" class="btn primary">新增页面</button>
+  </div>
+</aside>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>
